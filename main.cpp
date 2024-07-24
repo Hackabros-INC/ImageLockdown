@@ -83,7 +83,7 @@ void decrypt(const std::string& input_path, const std::string& output_path) {
         return -1;
     plaintext_len = len;
 
-    
+     /* Set expected tag value. Works in OpenSSL 1.0.1d and later */
         if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, GCM_TAG_LENGTH, tag))
         return -1;
 
