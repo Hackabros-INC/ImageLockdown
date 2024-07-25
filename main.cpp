@@ -39,10 +39,10 @@ int main(int argc, char *argv[]) {
   save_key(key, "private_key.pem", "public_key.pem");
 
   // Encrypt the file
-  encrypt("input.txt", "encrypted.txt");
+  encrypt("0.119 GB.TIF", "encrypted.TIF");
 
   // Decrypt the file
-  decrypt("encrypted.txt", "decrypted.txt");
+  decrypt("encrypted.TIF", "decrypted.TIF");
 
   // Clean up
   EVP_PKEY_free(key);

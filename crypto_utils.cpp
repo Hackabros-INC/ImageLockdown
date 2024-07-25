@@ -42,9 +42,12 @@ void encrypt(const std::string &input_path, const std::string &output_path) {
   EVP_PKEY_CTX_free(ctx);
 
   // Read input file
-  std::ifstream ifs(input_path, std::ios::binary);
-  std::vector<unsigned char> input_data((std::istreambuf_iterator<char>(ifs)),
-                                        std::istreambuf_iterator<char>());
+  std::ifstream ifs(input_path, std::ios::binary | std::ios::ate);
+  std::streamsize file_size = ifs.tellg();
+  ifs.seekg(0, std::ios::beg);
+
+  std::vector<unsigned char> input_data(file_size);
+  ifs.read(reinterpret_cast<char *>(input_data.data()), file_size);
   ifs.close();
 
   // Encrypt data with AES-256-GCM
