@@ -9,45 +9,46 @@
 #include <string>
 
 int main(int argc, char *argv[]) {
-  // Template
-  // if (argc != 4) {
-  //   std::cerr << "Uso: " << argv[0] << " <operation> <input_path>
-  //   <output_path>"
-  //             << std::endl;
-  //   return 1;
-  // }
+  if (argc != 4) {
+    std::cerr << "Uso: " << argv[0] << " <operation> <input_path> <output_path>"
+              << std::endl;
+    return 1;
+  }
 
-  // std::string operation = argv[1];
-  // std::string input_path = argv[2];
-  // std::string output_path = argv[3];
+  std::string operation = argv[1];
+  std::string input_path = argv[2];
+  std::string output_path = argv[3];
 
-  // if (operation == "encrypt") {
-  //   encrypt(input_path, output_path);
-  // } else if (operation == "decrypt") {
-  //   decrypt(input_path, output_path);
-  // } else {
-  //   std::cerr << "Operación no válida: " << operation << std::endl;
-  //   return 1;
-  // }
+  if (operation == "encrypt") {
+    // Initialize OpenSSL
+    OpenSSL_add_all_algorithms();
+    ERR_load_crypto_strings();
 
-  // Initialize OpenSSL
-  OpenSSL_add_all_algorithms();
-  ERR_load_crypto_strings();
+    // Generate RSA key pair
+    EVP_PKEY *key = generate_key();
+    save_key(key, "private_key.pem", "public_key.pem");
 
-  // Generate RSA key pair
-  EVP_PKEY *key = generate_key();
-  save_key(key, "private_key.pem", "public_key.pem");
+    encrypt(input_path, output_path);
 
-  // Encrypt the file
-  encrypt("0.119 GB.TIF", "encrypted.TIF");
+    // Clean up
+    EVP_PKEY_free(key);
+    EVP_cleanup();
+    ERR_free_strings();
+  } else if (operation == "decrypt") {
 
-  // Decrypt the file
-  decrypt("encrypted.TIF", "decrypted.TIF");
+    // Initialize OpenSSL
+    OpenSSL_add_all_algorithms();
+    ERR_load_crypto_strings();
 
-  // Clean up
-  EVP_PKEY_free(key);
-  EVP_cleanup();
-  ERR_free_strings();
+    decrypt(input_path, output_path);
+
+    // Clean up
+    EVP_cleanup();
+    ERR_free_strings();
+  } else {
+    std::cerr << "Operación no válida: " << operation << std::endl;
+    return 1;
+  }
 
   return 0;
 }
