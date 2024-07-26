@@ -20,6 +20,7 @@ int main(int argc, char *argv[]) {
   std::string output_path = argv[3];
 
   if (operation == "encrypt") {
+
     // Initialize OpenSSL
     OpenSSL_add_all_algorithms();
     ERR_load_crypto_strings();
@@ -34,6 +35,7 @@ int main(int argc, char *argv[]) {
     EVP_PKEY_free(key);
     EVP_cleanup();
     ERR_free_strings();
+
   } else if (operation == "decrypt") {
 
     // Initialize OpenSSL
@@ -45,6 +47,7 @@ int main(int argc, char *argv[]) {
     // Clean up
     EVP_cleanup();
     ERR_free_strings();
+
   } else {
     std::cerr << "Operación no válida: " << operation << std::endl;
     return 1;
