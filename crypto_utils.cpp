@@ -41,14 +41,19 @@ void encrypt(const std::string &input_path, const std::string &output_path) {
   encrypted_key.resize(outlen);
   EVP_PKEY_CTX_free(ctx);
 
-  // Read input file
-  std::ifstream ifs(input_path, std::ios::binary | std::ios::ate);
-  std::streamsize file_size = ifs.tellg();
-  ifs.seekg(0, std::ios::beg);
+  // Read input file in chunks
+  std::ifstream ifs(input_path, std::ios::binary);
+  if (!ifs.is_open())
+    handleErrors();
 
-  std::vector<unsigned char> input_data(file_size);
-  ifs.read(reinterpret_cast<char *>(input_data.data()), file_size);
-  ifs.close();
+  // Open output file
+  std::ofstream ofs(output_path, std::ios::binary);
+  if (!ofs.is_open())
+    handleErrors();
+
+  // Write the encrypted key and IV to the output file
+  ofs.write((char *)encrypted_key.data(), encrypted_key.size());
+  ofs.write((char *)iv, sizeof(iv));
 
   // Encrypt data with AES-256-GCM
   EVP_CIPHER_CTX *cipher_ctx = EVP_CIPHER_CTX_new();
@@ -58,19 +63,28 @@ void encrypt(const std::string &input_path, const std::string &output_path) {
   if (EVP_EncryptInit_ex(cipher_ctx, EVP_aes_256_gcm(), NULL, aes_key, iv) <= 0)
     handleErrors();
 
-  std::vector<unsigned char> ciphertext(input_data.size() +
+  const size_t buffer_size = 1024 * 1024; // 1 MB buffer
+  std::vector<unsigned char> buffer(buffer_size);
+  std::vector<unsigned char> ciphertext(buffer_size +
                                         16); // Add space for GCM tag
-  int len;
+  int len, ciphertext_len = 0;
 
-  if (EVP_EncryptUpdate(cipher_ctx, ciphertext.data(), &len, input_data.data(),
-                        input_data.size()) <= 0)
+  while (ifs.good()) {
+    ifs.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
+    std::streamsize bytes_read = ifs.gcount();
+
+    if (bytes_read > 0) {
+      if (EVP_EncryptUpdate(cipher_ctx, ciphertext.data(), &len, buffer.data(),
+                            bytes_read) <= 0)
+        handleErrors();
+      ofs.write(reinterpret_cast<char *>(ciphertext.data()), len);
+      ciphertext_len += len;
+    }
+  }
+
+  if (EVP_EncryptFinal_ex(cipher_ctx, ciphertext.data(), &len) <= 0)
     handleErrors();
-
-  int ciphertext_len = len;
-
-  if (EVP_EncryptFinal_ex(cipher_ctx, ciphertext.data() + len, &len) <= 0)
-    handleErrors();
-
+  ofs.write(reinterpret_cast<char *>(ciphertext.data()), len);
   ciphertext_len += len;
 
   // Get the GCM tag
@@ -81,13 +95,10 @@ void encrypt(const std::string &input_path, const std::string &output_path) {
 
   EVP_CIPHER_CTX_free(cipher_ctx);
 
-  // Write to output file
-  std::ofstream ofs(output_path, std::ios::binary);
-  ofs.write((char *)encrypted_key.data(), encrypted_key.size());
-  ofs.write((char *)iv, sizeof(iv));
-  ofs.write((char *)ciphertext.data(), ciphertext_len);
-  ofs.write((char *)tag.data(), tag.size());
+  // Write the tag to the output file
+  ofs.write(reinterpret_cast<char *>(tag.data()), tag.size());
   ofs.close();
+  ifs.close();
 
   std::cout << "Encrypted image" << std::endl;
 }
