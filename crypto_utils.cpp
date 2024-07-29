@@ -107,15 +107,25 @@ void decrypt(const std::string &input_path, const std::string &output_path) {
   std::cout << "input_path=" << input_path << std::endl;
   std::cout << "output_path=" << output_path << std::endl;
 
-  // Read input file
+  // Open input file in binary mode
   std::ifstream ifs(input_path, std::ios::binary);
+  if (!ifs.is_open())
+    handleErrors();
+
+  // Read encrypted key and IV
   std::vector<unsigned char> encrypted_key(256); // RSA 2048 bit key size
   std::vector<unsigned char> iv(12);
   std::vector<unsigned char> tag(16);
 
   ifs.read((char *)encrypted_key.data(), encrypted_key.size());
-  ifs.read((char *)iv.data(), iv.size());
+  if (ifs.gcount() != static_cast<std::streamsize>(encrypted_key.size()))
+    handleErrors();
 
+  ifs.read((char *)iv.data(), iv.size());
+  if (ifs.gcount() != static_cast<std::streamsize>(iv.size()))
+    handleErrors();
+
+  // Calculate the size of the encrypted data
   ifs.seekg(0, std::ios::end);
   std::streampos end = ifs.tellg();
   std::streamoff data_len = end -
@@ -123,14 +133,27 @@ void decrypt(const std::string &input_path, const std::string &output_path) {
                             static_cast<std::streamoff>(iv.size()) -
                             static_cast<std::streamoff>(tag.size());
 
+  // Return to the start of the encrypted data
   ifs.seekg(encrypted_key.size() + iv.size(), std::ios::beg);
-  std::vector<unsigned char> ciphertext(data_len);
-  ifs.read((char *)ciphertext.data(), ciphertext.size());
+
+  // Read the GCM tag at the end of the file
+  ifs.seekg(-tag.size(), std::ios::end);
   ifs.read((char *)tag.data(), tag.size());
-  ifs.close();
+  if (ifs.gcount() != static_cast<std::streamsize>(tag.size()))
+    handleErrors();
+
+  // Return to the start of the encrypted data
+  ifs.seekg(encrypted_key.size() + iv.size(), std::ios::beg);
+
+  // Open output file in binary mode
+  std::ofstream ofs(output_path, std::ios::binary);
+  if (!ofs.is_open())
+    handleErrors();
 
   // Load private key
   EVP_PKEY *private_key = load_key("private_key.pem", true);
+  if (!private_key)
+    handleErrors();
 
   // Decrypt AES key with RSA private key
   EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(private_key, NULL);
@@ -164,28 +187,37 @@ void decrypt(const std::string &input_path, const std::string &output_path) {
                          iv.data()) <= 0)
     handleErrors();
 
-  std::vector<unsigned char> plaintext(ciphertext.size());
-  int len;
-
-  if (EVP_DecryptUpdate(cipher_ctx, plaintext.data(), &len, ciphertext.data(),
-                        ciphertext.size()) <= 0)
+  if (EVP_CIPHER_CTX_ctrl(cipher_ctx, EVP_CTRL_GCM_SET_TAG, tag.size(),
+                          tag.data()) <= 0)
     handleErrors();
 
-  int plaintext_len = len;
+  const size_t buffer_size = 1024 * 1024; // Buffer size of 1 MB
+  std::vector<unsigned char> buffer(buffer_size);
+  std::vector<unsigned char> plaintext(buffer_size);
+  int len, plaintext_len = 0;
 
-  if (EVP_CIPHER_CTX_ctrl(cipher_ctx, EVP_CTRL_GCM_SET_TAG, 16, tag.data()) <=
-      0)
+  while (data_len > 0) {
+    size_t chunk_size = std::min(buffer_size, static_cast<size_t>(data_len));
+    ifs.read(reinterpret_cast<char *>(buffer.data()), chunk_size);
+    std::streamsize bytes_read = ifs.gcount();
+    data_len -= bytes_read;
+
+    if (bytes_read > 0) {
+      if (EVP_DecryptUpdate(cipher_ctx, plaintext.data(), &len, buffer.data(),
+                            bytes_read) <= 0)
+        handleErrors();
+      ofs.write(reinterpret_cast<char *>(plaintext.data()), len);
+      plaintext_len += len;
+    }
+  }
+
+  if (EVP_DecryptFinal_ex(cipher_ctx, plaintext.data(), &len) <= 0)
     handleErrors();
-
-  if (EVP_DecryptFinal_ex(cipher_ctx, plaintext.data() + len, &len) <= 0)
-    handleErrors();
-
+  ofs.write(reinterpret_cast<char *>(plaintext.data()), len);
   plaintext_len += len;
-  EVP_CIPHER_CTX_free(cipher_ctx);
 
-  // Write to output file
-  std::ofstream ofs(output_path, std::ios::binary);
-  ofs.write((char *)plaintext.data(), plaintext_len);
+  EVP_CIPHER_CTX_free(cipher_ctx);
+  ifs.close();
   ofs.close();
 
   std::cout << "Decrypted image" << std::endl;
