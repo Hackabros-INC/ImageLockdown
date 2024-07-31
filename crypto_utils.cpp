@@ -60,7 +60,7 @@ void encrypt(const std::string &input_path, const std::string &output_path) {
   if (!cipher_ctx)
     handleErrors();
 
-  if (EVP_EncryptInit_ex(cipher_ctx, EVP_aes_256_gcm(), NULL, aes_key, iv) <= 0)
+  if (EVP_EncryptInit_ex(cipher_ctx, EVP_aes_256_ctr(), NULL, aes_key, iv) <= 0)
     handleErrors();
 
   const size_t buffer_size = 1024 * 1024; // 1 MB buffer
@@ -87,16 +87,9 @@ void encrypt(const std::string &input_path, const std::string &output_path) {
   ofs.write(reinterpret_cast<char *>(ciphertext.data()), len);
   ciphertext_len += len;
 
-  // Get the GCM tag
-  std::vector<unsigned char> tag(16);
-  if (EVP_CIPHER_CTX_ctrl(cipher_ctx, EVP_CTRL_GCM_GET_TAG, 16, tag.data()) <=
-      0)
-    handleErrors();
-
   EVP_CIPHER_CTX_free(cipher_ctx);
 
-  // Write the tag to the output file
-  ofs.write(reinterpret_cast<char *>(tag.data()), tag.size());
+  // Close files
   ofs.close();
   ifs.close();
 
@@ -115,7 +108,6 @@ void decrypt(const std::string &input_path, const std::string &output_path) {
   // Read encrypted key and IV
   std::vector<unsigned char> encrypted_key(256); // RSA 2048 bit key size
   std::vector<unsigned char> iv(12);
-  std::vector<unsigned char> tag(16);
 
   ifs.read((char *)encrypted_key.data(), encrypted_key.size());
   if (ifs.gcount() != static_cast<std::streamsize>(encrypted_key.size()))
@@ -130,17 +122,7 @@ void decrypt(const std::string &input_path, const std::string &output_path) {
   std::streampos end = ifs.tellg();
   std::streamoff data_len = end -
                             static_cast<std::streamoff>(encrypted_key.size()) -
-                            static_cast<std::streamoff>(iv.size()) -
-                            static_cast<std::streamoff>(tag.size());
-
-  // Return to the start of the encrypted data
-  ifs.seekg(encrypted_key.size() + iv.size(), std::ios::beg);
-
-  // Read the GCM tag at the end of the file
-  ifs.seekg(-tag.size(), std::ios::end);
-  ifs.read((char *)tag.data(), tag.size());
-  if (ifs.gcount() != static_cast<std::streamsize>(tag.size()))
-    handleErrors();
+                            static_cast<std::streamoff>(iv.size());
 
   // Return to the start of the encrypted data
   ifs.seekg(encrypted_key.size() + iv.size(), std::ios::beg);
@@ -183,12 +165,8 @@ void decrypt(const std::string &input_path, const std::string &output_path) {
   if (!cipher_ctx)
     handleErrors();
 
-  if (EVP_DecryptInit_ex(cipher_ctx, EVP_aes_256_gcm(), NULL, aes_key.data(),
+  if (EVP_DecryptInit_ex(cipher_ctx, EVP_aes_256_ctr(), NULL, aes_key.data(),
                          iv.data()) <= 0)
-    handleErrors();
-
-  if (EVP_CIPHER_CTX_ctrl(cipher_ctx, EVP_CTRL_GCM_SET_TAG, tag.size(),
-                          tag.data()) <= 0)
     handleErrors();
 
   const size_t buffer_size = 1024 * 1024; // Buffer size of 1 MB
