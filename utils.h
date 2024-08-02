@@ -1,8 +1,8 @@
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/pem.h>
-#include <openssl/rand.h>
-#include <string>
+#include <openssl/err.h>  // Include for OpenSSL error handling
+#include <openssl/evp.h>  // Include for OpenSSL EVP functions
+#include <openssl/pem.h>  // Include for OpenSSL PEM functions
+#include <openssl/rand.h> // Include for OpenSSL random number generation
+#include <string>         // Include for string handling
 
 void handleErrors();
 

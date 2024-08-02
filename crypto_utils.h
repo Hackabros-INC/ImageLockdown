@@ -1,6 +1,5 @@
-#include <string>
+#include <string> // Include for string handling
 
-// Declaraciones de funciones
 void aes_256_ctr_enc(const std::string &input_path,
                      const std::string &output_path);
 void aes_256_ctr_dec(const std::string &input_path,
