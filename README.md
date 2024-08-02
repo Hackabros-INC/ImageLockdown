@@ -47,4 +47,4 @@ This program was developed by:
 1. [Harold Andres Riascos Manyoma](https://github.com/Larryc8)
 2. [Jose Miguel Caicedo Ortiz](https://github.com/JOSEMIGUELCAICEDOORTIZ)
 3. [Julian Esteban Gallego Lenis](https://github.com/Lazk3r)
-4. [Santiago](https://github.com/Santiago7768)
+4. [Santiago Ruiz Quintero](https://github.com/Santiago7768)
