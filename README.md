@@ -15,7 +15,6 @@ To compile the ImageLockdown program, follow these steps:
 
     ```bash
     mkdir build
-    cd build
     ```
 
 3. **Compile the program using `make`:**
