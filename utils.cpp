@@ -1,3 +1,4 @@
+#include <fstream>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -53,4 +54,21 @@ EVP_PKEY *load_key(const std::string &filename, bool is_private) {
 
   fclose(key_file);
   return pkey;
+}
+
+bool file_exists(const std::string &filename) {
+  std::ifstream file(filename);
+  return file.good();
+}
+
+void check_and_generate_keys(const std::string &private_key_path,
+                             const std::string &public_key_path) {
+  if (!(file_exists(private_key_path) && file_exists(public_key_path))) {
+    // Generar y guardar el par de llaves RSA
+    EVP_PKEY *key = generate_key();
+    save_key(key, private_key_path.c_str(), public_key_path.c_str());
+
+    // Liberar recursos
+    EVP_PKEY_free(key);
+  }
 }

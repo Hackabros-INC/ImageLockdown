@@ -1,57 +1,47 @@
-#include "crypto_utils.h"
-#include "utils.h"
-#include <cstdlib>
 #include <iostream>
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/pem.h>
-#include <openssl/rand.h>
 #include <string>
+#include <cstdlib>
+#include "crypto_utils.h"
 
-int main(int argc, char *argv[]) {
-  if (argc != 4) {
-    std::cerr << "Uso: " << argv[0] << " <operation> <input_path> <output_path>"
-              << std::endl;
-    return 1;
-  }
+void encrypt(const std::string& input_path, const std::string& output_path);
+void decrypt(const std::string& input_path, const std::string& output_path);
 
-  std::string operation = argv[1];
-  std::string input_path = argv[2];
-  std::string output_path = argv[3];
+int main(int argc, char* argv[]) {
+    if (argc != 4) {
+        std::cerr << "Uso: " << argv[0] << " <operation> <input_path> <output_path>" << std::endl;
+        return 1;
+    }
 
-  if (operation == "encrypt") {
+    std::string operation = argv[1];
+    std::string input_path = argv[2];
+    std::string output_path = argv[3];
 
-    // Initialize OpenSSL
-    OpenSSL_add_all_algorithms();
-    ERR_load_crypto_strings();
+    if (operation == "encrypt") {
+        encrypt(input_path, output_path);
+    } else if (operation == "decrypt") {
+        decrypt(input_path, output_path);
+    } else {
+        std::cerr << "Operación no válida: " << operation << std::endl;
+        return 1;
+    }
 
-    // Generate RSA key pair
-    EVP_PKEY *key = generate_key();
-    save_key(key, "private_key.pem", "public_key.pem");
+    return 0;
+}
 
-    encrypt(input_path, output_path);
+void encrypt(const std::string& input_path, const std::string& output_path) {
+    std::cout << "input_path=" << input_path << std::endl;
+    std::cout << "output_path=" << output_path << std::endl;
 
-    // Clean up
-    EVP_PKEY_free(key);
-    EVP_cleanup();
-    ERR_free_strings();
+    aes_256_ctr_enc(input_path, output_path);
 
-  } else if (operation == "decrypt") {
+    std::cout << "Encrypted image" << std::endl;
+}
 
-    // Initialize OpenSSL
-    OpenSSL_add_all_algorithms();
-    ERR_load_crypto_strings();
+void decrypt(const std::string& input_path, const std::string& output_path) {
+    std::cout << "input_path=" << input_path << std::endl;
+    std::cout << "output_path=" << output_path << std::endl;
 
-    decrypt(input_path, output_path);
+    aes_256_ctr_dec(input_path, output_path);
 
-    // Clean up
-    EVP_cleanup();
-    ERR_free_strings();
-
-  } else {
-    std::cerr << "Operación no válida: " << operation << std::endl;
-    return 1;
-  }
-
-  return 0;
+    std::cout << "Decrypted image" << std::endl;
 }

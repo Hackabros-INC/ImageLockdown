@@ -7,12 +7,14 @@
 #include <openssl/rand.h>
 #include <vector>
 
-void encrypt(const std::string &input_path, const std::string &output_path) {
-  std::cout << "input_path=" << input_path << std::endl;
-  std::cout << "output_path=" << output_path << std::endl;
+void aes_256_ctr_enc(const std::string &input_path,
+                     const std::string &output_path) {
+
+  check_and_generate_keys("private_key.pem", "public_key.pem");
 
   // Generate AES key and IV
-  unsigned char aes_key[32], iv[16]; // IV size for AES-CTR is typically 16 bytes
+  unsigned char aes_key[32],
+      iv[16]; // IV size for AES-CTR is typically 16 bytes
   if (!RAND_bytes(aes_key, sizeof(aes_key)) || !RAND_bytes(iv, sizeof(iv)))
     handleErrors();
 
@@ -53,9 +55,11 @@ void encrypt(const std::string &input_path, const std::string &output_path) {
 
   // Write the encrypted key length, encrypted key, and IV to the output file
   size_t encrypted_key_len = encrypted_key.size();
-  ofs.write(reinterpret_cast<char*>(&encrypted_key_len), sizeof(encrypted_key_len));
-  ofs.write(reinterpret_cast<char*>(encrypted_key.data()), encrypted_key.size());
-  ofs.write(reinterpret_cast<char*>(iv), sizeof(iv));
+  ofs.write(reinterpret_cast<char *>(&encrypted_key_len),
+            sizeof(encrypted_key_len));
+  ofs.write(reinterpret_cast<char *>(encrypted_key.data()),
+            encrypted_key.size());
+  ofs.write(reinterpret_cast<char *>(iv), sizeof(iv));
 
   // Encrypt data with AES-256-CTR
   EVP_CIPHER_CTX *cipher_ctx = EVP_CIPHER_CTX_new();
@@ -67,25 +71,26 @@ void encrypt(const std::string &input_path, const std::string &output_path) {
 
   const size_t buffer_size = 1024 * 1024; // 1 MB buffer
   std::vector<unsigned char> buffer(buffer_size);
-  std::vector<unsigned char> ciphertext(buffer_size + EVP_CIPHER_block_size(EVP_aes_256_ctr()));
+  std::vector<unsigned char> ciphertext(
+      buffer_size + EVP_CIPHER_block_size(EVP_aes_256_ctr()));
   int len, ciphertext_len = 0;
 
   while (ifs.good()) {
-    ifs.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
+    ifs.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
     std::streamsize bytes_read = ifs.gcount();
 
     if (bytes_read > 0) {
       if (EVP_EncryptUpdate(cipher_ctx, ciphertext.data(), &len, buffer.data(),
                             bytes_read) <= 0)
         handleErrors();
-      ofs.write(reinterpret_cast<char*>(ciphertext.data()), len);
+      ofs.write(reinterpret_cast<char *>(ciphertext.data()), len);
       ciphertext_len += len;
     }
   }
   // Save data in the output file
   if (EVP_EncryptFinal_ex(cipher_ctx, ciphertext.data(), &len) <= 0)
     handleErrors();
-  ofs.write(reinterpret_cast<char*>(ciphertext.data()), len);
+  ofs.write(reinterpret_cast<char *>(ciphertext.data()), len);
   ciphertext_len += len;
 
   EVP_CIPHER_CTX_free(cipher_ctx);
@@ -93,13 +98,12 @@ void encrypt(const std::string &input_path, const std::string &output_path) {
   // Close files
   ofs.close();
   ifs.close();
-
-  std::cout << "Encrypted image" << std::endl;
 }
 
-void decrypt(const std::string &input_path, const std::string &output_path) {
-  std::cout << "input_path=" << input_path << std::endl;
-  std::cout << "output_path=" << output_path << std::endl;
+void aes_256_ctr_dec(const std::string &input_path,
+                     const std::string &output_path) {
+
+  check_and_generate_keys("private_key.pem", "public_key.pem");
 
   // Open input file in binary mode
   std::ifstream ifs(input_path, std::ios::binary);
@@ -108,32 +112,36 @@ void decrypt(const std::string &input_path, const std::string &output_path) {
 
   // Read the length of the encrypted key
   size_t encrypted_key_len;
-  ifs.read(reinterpret_cast<char*>(&encrypted_key_len), sizeof(encrypted_key_len));
+  ifs.read(reinterpret_cast<char *>(&encrypted_key_len),
+           sizeof(encrypted_key_len));
   if (!ifs.good())
     handleErrors();
 
   // Read the encrypted key and IV
   std::vector<unsigned char> encrypted_key(encrypted_key_len);
-  std::vector<unsigned char> iv(16); // IV size for AES-CTR is typically 16 bytes
+  std::vector<unsigned char> iv(
+      16); // IV size for AES-CTR is typically 16 bytes
 
-  ifs.read(reinterpret_cast<char*>(encrypted_key.data()), encrypted_key.size());
+  ifs.read(reinterpret_cast<char *>(encrypted_key.data()),
+           encrypted_key.size());
   if (ifs.gcount() != static_cast<std::streamsize>(encrypted_key.size()))
     handleErrors();
 
-  ifs.read(reinterpret_cast<char*>(iv.data()), iv.size());
+  ifs.read(reinterpret_cast<char *>(iv.data()), iv.size());
   if (ifs.gcount() != static_cast<std::streamsize>(iv.size()))
     handleErrors();
 
   // Calculate the size of the encrypted data
   ifs.seekg(0, std::ios::end);
   std::streampos end = ifs.tellg();
-  std::streamoff data_len = end -
-                            static_cast<std::streamoff>(sizeof(encrypted_key_len)) -
-                            static_cast<std::streamoff>(encrypted_key.size()) -
-                            static_cast<std::streamoff>(iv.size());
+  std::streamoff data_len =
+      end - static_cast<std::streamoff>(sizeof(encrypted_key_len)) -
+      static_cast<std::streamoff>(encrypted_key.size()) -
+      static_cast<std::streamoff>(iv.size());
 
   // Return to the start of the encrypted data
-  ifs.seekg(sizeof(encrypted_key_len) + encrypted_key.size() + iv.size(), std::ios::beg);
+  ifs.seekg(sizeof(encrypted_key_len) + encrypted_key.size() + iv.size(),
+            std::ios::beg);
 
   // Open output file in binary mode
   std::ofstream ofs(output_path, std::ios::binary);
@@ -205,6 +213,4 @@ void decrypt(const std::string &input_path, const std::string &output_path) {
   EVP_CIPHER_CTX_free(cipher_ctx);
   ifs.close();
   ofs.close();
-
-  std::cout << "Decrypted image" << std::endl;
 }

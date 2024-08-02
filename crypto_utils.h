@@ -1,5 +1,7 @@
 #include <string>
 
 // Declaraciones de funciones
-void encrypt(const std::string &input_path, const std::string &output_path);
-void decrypt(const std::string &input_path, const std::string &output_path);
+void aes_256_ctr_enc(const std::string &input_path,
+                     const std::string &output_path);
+void aes_256_ctr_dec(const std::string &input_path,
+                     const std::string &output_path);
