@@ -1,3 +1,7 @@
+// The base for encrypting and decrypting the images
+// was taken from the oficial documentation of OpenSSL
+// https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Setting_it_up
+
 #include "utils.h"        // Custom utility functions
 #include <fstream>        // Include for file handling
 #include <iostream>       // Include for input and output stream handling
