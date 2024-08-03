@@ -45,6 +45,12 @@ To compile the ImageLockdown program, follow these steps:
 In the `assets` directory, you will find:
 - Two files containing the program's performance metrics with various datasets.
 - A PDF document that provides a detailed explanation of the program's design and the implemented solution.
+- A video explaining the implementation of the solution.
+
+## Video Explanation
+Below is the video that explains the implementation of the solution:
+
+[![Video Explanation](assets/video_thumbnail.png)](assets/implementation_video.mp4)
 
 ## Authors
 This program was developed by:
