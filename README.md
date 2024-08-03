@@ -41,6 +41,11 @@ To compile the ImageLockdown program, follow these steps:
 
 - The OpenSSL library is required for the program to function correctly. Make sure it is installed on your system.
 
+## Assets
+In the `assets` directory, you will find:
+- Two files containing the program's performance metrics with various datasets.
+- A PDF document that provides a detailed explanation of the program's design and the implemented solution.
+
 ## Authors
 This program was developed by:
 
