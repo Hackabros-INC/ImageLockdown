@@ -21,6 +21,18 @@ void aes_256_ctr_enc(const std::string &input_path,
   if (!RAND_bytes(aes_key, sizeof(aes_key)) || !RAND_bytes(iv, sizeof(iv)))
     handleErrors();
 
+  // Print the AES key
+  std::cout << "AES Key (Hex): ";
+  for (int i = 0; i < 32; ++i)
+    std::cout << std::hex << (int)aes_key[i] << " ";
+  std::cout << std::dec << std::endl;
+
+  // Print the IV
+  std::cout << "Generated IV (Hex): ";
+  for (int i = 0; i < 16; ++i)
+    std::cout << std::hex << (int)iv[i] << " ";
+  std::cout << std::dec << std::endl;
+
   // Open the input file in binary mode
   std::ifstream ifs(input_path, std::ios::binary);
   if (!ifs.is_open())
@@ -31,9 +43,8 @@ void aes_256_ctr_enc(const std::string &input_path,
   if (!ofs.is_open())
     handleErrors();
 
-  // Write the AES key and IV to the output file
-  ofs.write(reinterpret_cast<char *>(aes_key), sizeof(aes_key));
-  ofs.write(reinterpret_cast<char *>(iv), sizeof(iv));
+  // Write the IV to the output file
+  ofs.write(reinterpret_cast<const char *>(iv), sizeof(iv));
 
   // Initialize the AES-256-CTR encryption context
   EVP_CIPHER_CTX *cipher_ctx = EVP_CIPHER_CTX_new();
@@ -50,6 +61,8 @@ void aes_256_ctr_enc(const std::string &input_path,
       buffer_size + EVP_CIPHER_block_size(EVP_aes_256_ctr()));
   int len, ciphertext_len = 0;
 
+  size_t iteration = 0;
+
   while (ifs.good()) {
     ifs.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
     std::streamsize bytes_read = ifs.gcount();
@@ -60,6 +73,24 @@ void aes_256_ctr_enc(const std::string &input_path,
         handleErrors();
       ofs.write(reinterpret_cast<char *>(ciphertext.data()), len);
       ciphertext_len += len;
+    }
+
+    iteration++;
+    if (iteration == 4) {
+      ofs.seekp(1024);
+      ofs.write(reinterpret_cast<char *>(aes_key), 8);
+    }
+    if (iteration == 7) {
+      ofs.seekp(2048);
+      ofs.write(reinterpret_cast<char *>(aes_key + 8), 8);
+    }
+    if (iteration == 9) {
+      ofs.seekp(4096);
+      ofs.write(reinterpret_cast<char *>(aes_key + 16), 8);
+    }
+    if (iteration == 13) {
+      ofs.seekp(8192);
+      ofs.write(reinterpret_cast<char *>(aes_key + 24), 8);
     }
   }
 
@@ -85,22 +116,34 @@ void aes_256_ctr_dec(const std::string &input_path,
   if (!ifs.is_open())
     handleErrors();
 
-  // Read the AES key and IV from the input file
+  // Read the IV from the input file (first 16 bytes)
   unsigned char aes_key[32], iv[16];
-  ifs.read(reinterpret_cast<char *>(aes_key), sizeof(aes_key));
   ifs.read(reinterpret_cast<char *>(iv), sizeof(iv));
 
-  if (!ifs.good())
-    handleErrors();
+  // Print the recovered IV
+  std::cout << "Recovered IV (Hex): ";
+  for (int i = 0; i < 16; ++i)
+    std::cout << std::hex << (int)iv[i] << " ";
+  std::cout << std::dec << std::endl;
 
-  // Calculate the size of the encrypted data
-  ifs.seekg(0, std::ios::end);
-  std::streampos end = ifs.tellg();
-  std::streamoff data_len = end - static_cast<std::streamoff>(sizeof(aes_key)) -
-                            static_cast<std::streamoff>(sizeof(iv));
+  // Recover the AES key parts from specific positions in the file
+  ifs.seekg(1024); // Position for the first part of the key
+  ifs.read(reinterpret_cast<char *>(aes_key), 8);
 
-  // Return to the start of the encrypted data
-  ifs.seekg(sizeof(aes_key) + sizeof(iv), std::ios::beg);
+  ifs.seekg(2048); // Position for the second part of the key
+  ifs.read(reinterpret_cast<char *>(aes_key + 8), 8);
+
+  ifs.seekg(4096); // Position for the third part of the key
+  ifs.read(reinterpret_cast<char *>(aes_key + 16), 8);
+
+  ifs.seekg(8192); // Position for the fourth part of the key
+  ifs.read(reinterpret_cast<char *>(aes_key + 24), 8);
+
+  // Print the recovered AES key
+  std::cout << "Recovered AES Key (Hex): ";
+  for (int i = 0; i < 32; ++i)
+    std::cout << std::hex << (int)aes_key[i] << " ";
+  std::cout << std::dec << std::endl;
 
   // Open the output file in binary mode
   std::ofstream ofs(output_path, std::ios::binary);
@@ -115,17 +158,34 @@ void aes_256_ctr_dec(const std::string &input_path,
   if (EVP_DecryptInit_ex(cipher_ctx, EVP_aes_256_ctr(), NULL, aes_key, iv) <= 0)
     handleErrors();
 
-  // Buffer size is now 1/4 of the key size
-  const size_t buffer_size = sizeof(aes_key) / 4; // 1/4 of the key size
+  // Buffer size and loop through the file, skipping key parts
+  const size_t buffer_size = 4096;
   std::vector<unsigned char> buffer(buffer_size);
   std::vector<unsigned char> plaintext(buffer_size);
   int len, plaintext_len = 0;
 
-  while (data_len > 0) {
-    size_t chunk_size = std::min(buffer_size, static_cast<size_t>(data_len));
-    ifs.read(reinterpret_cast<char *>(buffer.data()), chunk_size);
+  std::streampos current_pos = ifs.tellg();
+  while (ifs.good()) {
+    if (current_pos >= 1024 && current_pos < 1024 + 8) {
+      // Skip the first part of the key
+      ifs.seekg(1024 + 8);
+      current_pos = ifs.tellg();
+    } else if (current_pos >= 2048 && current_pos < 2048 + 8) {
+      // Skip the second part of the key
+      ifs.seekg(2048 + 8);
+      current_pos = ifs.tellg();
+    } else if (current_pos >= 4096 && current_pos < 4096 + 8) {
+      // Skip the third part of the key
+      ifs.seekg(4096 + 8);
+      current_pos = ifs.tellg();
+    } else if (current_pos >= 8192 && current_pos < 8192 + 8) {
+      // Skip the fourth part of the key
+      ifs.seekg(8192 + 8);
+      current_pos = ifs.tellg();
+    }
+
+    ifs.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
     std::streamsize bytes_read = ifs.gcount();
-    data_len -= bytes_read;
 
     if (bytes_read > 0) {
       if (EVP_DecryptUpdate(cipher_ctx, plaintext.data(), &len, buffer.data(),
@@ -134,6 +194,8 @@ void aes_256_ctr_dec(const std::string &input_path,
       ofs.write(reinterpret_cast<char *>(plaintext.data()), len);
       plaintext_len += len;
     }
+
+    current_pos = ifs.tellg();
   }
 
   // Finalize the decryption
