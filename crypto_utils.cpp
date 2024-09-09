@@ -2,7 +2,8 @@
 // was taken from the oficial documentation of OpenSSL
 // https://wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption#Setting_it_up
 
-#include "utils.h"        // Custom utility functions
+#include "utils.h" // Custom utility functions
+#include <cstring>
 #include <fstream>        // Include for file handling
 #include <iostream>       // Include for input and output stream handling
 #include <openssl/err.h>  // Include for OpenSSL error handling
@@ -11,62 +12,52 @@
 #include <openssl/rand.h> // Include for OpenSSL random number generation
 #include <vector>         // Include for using the vector container
 
-// Function to encrypt a file using AES-256-CTR
 void aes_256_ctr_enc(const std::string &input_path,
                      const std::string &output_path) {
-
-  // Generate AES key and IV (initialization vector)
-  unsigned char aes_key[32],
-      iv[16]; // AES-256 requires a 32-byte key and 16-byte IV
+  // Generar la llave AES y el IV
+  unsigned char aes_key[32], iv[16];
   if (!RAND_bytes(aes_key, sizeof(aes_key)) || !RAND_bytes(iv, sizeof(iv)))
     handleErrors();
 
-  // Print the AES key
-  std::cout << "AES Key (Hex): ";
-  for (int i = 0; i < 32; ++i)
-    std::cout << std::hex << (int)aes_key[i] << " ";
-  std::cout << std::dec << std::endl;
+  // Reorganizar las partes de la llave
+  unsigned char reorganized_key[32];
+  std::memcpy(reorganized_key, aes_key + 16,
+              8); // Tercera parte a la primera posición
+  std::memcpy(reorganized_key + 8, aes_key,
+              8); // Primera parte a la segunda posición
+  std::memcpy(reorganized_key + 16, aes_key + 24,
+              8); // Cuarta parte a la tercera posición
+  std::memcpy(reorganized_key + 24, aes_key + 8,
+              8); // Segunda parte a la cuarta posición
 
-  // Print the IV
-  std::cout << "Generated IV (Hex): ";
-  for (int i = 0; i < 16; ++i)
-    std::cout << std::hex << (int)iv[i] << " ";
-  std::cout << std::dec << std::endl;
-
-  // Open the input file in binary mode
+  // Abrir los archivos de entrada y salida
   std::ifstream ifs(input_path, std::ios::binary);
   if (!ifs.is_open())
     handleErrors();
-
-  // Open the output file in binary mode
   std::ofstream ofs(output_path, std::ios::binary);
   if (!ofs.is_open())
     handleErrors();
 
-  // Write the IV to the output file
-  ofs.write(reinterpret_cast<const char *>(iv), sizeof(iv));
+  // Escribir la llave reorganizada y el IV en el archivo de salida
+  ofs.write(reinterpret_cast<char *>(reorganized_key), sizeof(reorganized_key));
+  ofs.write(reinterpret_cast<char *>(iv), sizeof(iv));
 
-  // Initialize the AES-256-CTR encryption context
+  // Inicializar el contexto de encriptación
   EVP_CIPHER_CTX *cipher_ctx = EVP_CIPHER_CTX_new();
   if (!cipher_ctx)
     handleErrors();
-
   if (EVP_EncryptInit_ex(cipher_ctx, EVP_aes_256_ctr(), NULL, aes_key, iv) <= 0)
     handleErrors();
 
-  // Buffer size is now 1/4 of the key size
-  const size_t buffer_size = sizeof(aes_key) / 4; // 1/4 of the key size
-  std::vector<unsigned char> buffer(buffer_size);
+  // Encriptar el archivo
+  std::vector<unsigned char> buffer(1024);
   std::vector<unsigned char> ciphertext(
-      buffer_size + EVP_CIPHER_block_size(EVP_aes_256_ctr()));
+      buffer.size() + EVP_CIPHER_block_size(EVP_aes_256_ctr()));
   int len, ciphertext_len = 0;
-
-  size_t iteration = 0;
 
   while (ifs.good()) {
     ifs.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
     std::streamsize bytes_read = ifs.gcount();
-
     if (bytes_read > 0) {
       if (EVP_EncryptUpdate(cipher_ctx, ciphertext.data(), &len, buffer.data(),
                             bytes_read) <= 0)
@@ -74,119 +65,62 @@ void aes_256_ctr_enc(const std::string &input_path,
       ofs.write(reinterpret_cast<char *>(ciphertext.data()), len);
       ciphertext_len += len;
     }
-
-    iteration++;
-    if (iteration == 4) {
-      ofs.seekp(1024);
-      ofs.write(reinterpret_cast<char *>(aes_key), 8);
-    }
-    if (iteration == 7) {
-      ofs.seekp(2048);
-      ofs.write(reinterpret_cast<char *>(aes_key + 8), 8);
-    }
-    if (iteration == 9) {
-      ofs.seekp(4096);
-      ofs.write(reinterpret_cast<char *>(aes_key + 16), 8);
-    }
-    if (iteration == 13) {
-      ofs.seekp(8192);
-      ofs.write(reinterpret_cast<char *>(aes_key + 24), 8);
-    }
   }
 
-  // Finalize the encryption
+  // Finalizar la encriptación
   if (EVP_EncryptFinal_ex(cipher_ctx, ciphertext.data(), &len) <= 0)
     handleErrors();
   ofs.write(reinterpret_cast<char *>(ciphertext.data()), len);
   ciphertext_len += len;
 
   EVP_CIPHER_CTX_free(cipher_ctx);
-
-  // Close the files
   ofs.close();
   ifs.close();
 }
 
-// Function to decrypt a file using AES-256-CTR
 void aes_256_ctr_dec(const std::string &input_path,
                      const std::string &output_path) {
-
-  // Open the input file in binary mode
+  // Abrir el archivo de entrada
   std::ifstream ifs(input_path, std::ios::binary);
   if (!ifs.is_open())
     handleErrors();
 
-  // Read the IV from the input file (first 16 bytes)
-  unsigned char aes_key[32], iv[16];
+  // Leer la llave reorganizada y el IV del archivo de entrada
+  unsigned char reorganized_key[32], iv[16];
+  ifs.read(reinterpret_cast<char *>(reorganized_key), sizeof(reorganized_key));
   ifs.read(reinterpret_cast<char *>(iv), sizeof(iv));
 
-  // Print the recovered IV
-  std::cout << "Recovered IV (Hex): ";
-  for (int i = 0; i < 16; ++i)
-    std::cout << std::hex << (int)iv[i] << " ";
-  std::cout << std::dec << std::endl;
+  // Reorganizar las partes de la llave para obtener la original
+  unsigned char aes_key[32];
+  std::memcpy(aes_key, reorganized_key + 8,
+              8); // Segunda parte (originalmente la primera)
+  std::memcpy(aes_key + 8, reorganized_key + 24,
+              8); // Cuarta parte (originalmente la segunda)
+  std::memcpy(aes_key + 16, reorganized_key,
+              8); // Primera parte (originalmente la tercera)
+  std::memcpy(aes_key + 24, reorganized_key + 16,
+              8); // Tercera parte (originalmente la cuarta)
 
-  // Recover the AES key parts from specific positions in the file
-  ifs.seekg(1024); // Position for the first part of the key
-  ifs.read(reinterpret_cast<char *>(aes_key), 8);
-
-  ifs.seekg(2048); // Position for the second part of the key
-  ifs.read(reinterpret_cast<char *>(aes_key + 8), 8);
-
-  ifs.seekg(4096); // Position for the third part of the key
-  ifs.read(reinterpret_cast<char *>(aes_key + 16), 8);
-
-  ifs.seekg(8192); // Position for the fourth part of the key
-  ifs.read(reinterpret_cast<char *>(aes_key + 24), 8);
-
-  // Print the recovered AES key
-  std::cout << "Recovered AES Key (Hex): ";
-  for (int i = 0; i < 32; ++i)
-    std::cout << std::hex << (int)aes_key[i] << " ";
-  std::cout << std::dec << std::endl;
-
-  // Open the output file in binary mode
+  // Abrir el archivo de salida
   std::ofstream ofs(output_path, std::ios::binary);
   if (!ofs.is_open())
     handleErrors();
 
-  // Initialize the AES-256-CTR decryption context
+  // Inicializar el contexto de desencriptación
   EVP_CIPHER_CTX *cipher_ctx = EVP_CIPHER_CTX_new();
   if (!cipher_ctx)
     handleErrors();
-
   if (EVP_DecryptInit_ex(cipher_ctx, EVP_aes_256_ctr(), NULL, aes_key, iv) <= 0)
     handleErrors();
 
-  // Buffer size and loop through the file, skipping key parts
-  const size_t buffer_size = 4096;
-  std::vector<unsigned char> buffer(buffer_size);
-  std::vector<unsigned char> plaintext(buffer_size);
+  // Desencriptar el archivo
+  std::vector<unsigned char> buffer(1024);
+  std::vector<unsigned char> plaintext(buffer.size());
   int len, plaintext_len = 0;
 
-  std::streampos current_pos = ifs.tellg();
   while (ifs.good()) {
-    if (current_pos >= 1024 && current_pos < 1024 + 8) {
-      // Skip the first part of the key
-      ifs.seekg(1024 + 8);
-      current_pos = ifs.tellg();
-    } else if (current_pos >= 2048 && current_pos < 2048 + 8) {
-      // Skip the second part of the key
-      ifs.seekg(2048 + 8);
-      current_pos = ifs.tellg();
-    } else if (current_pos >= 4096 && current_pos < 4096 + 8) {
-      // Skip the third part of the key
-      ifs.seekg(4096 + 8);
-      current_pos = ifs.tellg();
-    } else if (current_pos >= 8192 && current_pos < 8192 + 8) {
-      // Skip the fourth part of the key
-      ifs.seekg(8192 + 8);
-      current_pos = ifs.tellg();
-    }
-
     ifs.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
     std::streamsize bytes_read = ifs.gcount();
-
     if (bytes_read > 0) {
       if (EVP_DecryptUpdate(cipher_ctx, plaintext.data(), &len, buffer.data(),
                             bytes_read) <= 0)
@@ -194,19 +128,15 @@ void aes_256_ctr_dec(const std::string &input_path,
       ofs.write(reinterpret_cast<char *>(plaintext.data()), len);
       plaintext_len += len;
     }
-
-    current_pos = ifs.tellg();
   }
 
-  // Finalize the decryption
+  // Finalizar la desencriptación
   if (EVP_DecryptFinal_ex(cipher_ctx, plaintext.data(), &len) <= 0)
     handleErrors();
   ofs.write(reinterpret_cast<char *>(plaintext.data()), len);
   plaintext_len += len;
 
   EVP_CIPHER_CTX_free(cipher_ctx);
-
-  // Close the files
   ifs.close();
   ofs.close();
 }
