@@ -11,10 +11,10 @@ To compile the ImageLockdown program, follow these steps:
     git clone https://github.com/Hackabros-INC/ImageLockdown.git
     ```
 
-2. **Create a `build` directory:**
+2. **Execute cmake:**
 
     ```bash
-    mkdir build
+    cmake .
     ```
 
 3. **Compile the program using `make`:**
@@ -23,12 +23,12 @@ To compile the ImageLockdown program, follow these steps:
     make
     ```
 
-    This command will create an executable named `ImageLockdown` in the `build` directory.
+    This command will create an executable named `main` in the root directory.
 
 4. **Run the executable:**
 
     ```bash
-    ./ImageLockdown
+    ./main
     ```
 
 ### Notes:
