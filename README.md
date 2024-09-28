@@ -1,61 +1,53 @@
 # ImageLockdown
-ImageLockdown is a powerful tool designed for encrypting and decrypting satellite images.
 
-## Compilation Steps
+ImageLockdown is a C++ program that encrypts and decrypts image files using the AES-256 algorithm from the OpenSSL library. The program now supports two modes of operation: CTR (Counter) and GCM (Galois/Counter Mode).
 
-To compile the ImageLockdown program, follow these steps:
+## Usage
 
-1. **Clone the repository:**
+```bash
+./main <mode> <enc/dec> <input_path> <output_path>
+```
 
+- `<mode>`: Set the encryption/decryption mode.
+  - `0` for AES-256-CTR.
+  - `1` for AES-256-GCM.
+- `<enc/dec>`: Choose whether to encrypt (`enc`) or decrypt (`dec`) the file.
+- `<input_path>`: Path to the input file (the image to be encrypted or the encrypted file to be decrypted).
+- `<output_path>`: Path where the output file will be saved (either the encrypted file or the decrypted image).
+
+### Example
+
+1. **Encrypt an image in CTR mode**:
     ```bash
-    git clone https://github.com/Hackabros-INC/ImageLockdown.git
+    ./main 0 enc image.jpg encrypted_image.bin
     ```
 
-2. **Execute cmake:**
-
+2. **Decrypt an image in CTR mode**:
     ```bash
-    cmake .
+    ./main 0 dec encrypted_image.bin decrypted_image.jpg
     ```
 
-3. **Compile the program using `make`:**
-
+3. **Encrypt an image in GCM mode**:
     ```bash
-    make
+    ./main 1 enc image.jpg encrypted_image.bin
     ```
 
-    This command will create an executable named `main` in the root directory.
-
-4. **Run the executable:**
-
+4. **Decrypt an image in GCM mode**:
     ```bash
-    ./main
+    ./main 1 dec encrypted_image.bin decrypted_image.jpg
     ```
 
-### Notes:
-- The program has been tested on Linux operating systems.
-- To clean up the `build` directory and remove the `ImageLockdown` executable, use the following command:
+## Prerequisites
 
-    ```bash
-    make clean
-    ```
+- OpenSSL library installed
+- C++17 or later
 
-- The OpenSSL library is required for the program to function correctly. Make sure it is installed on your system.
+## Compilation
 
-## Assets
-In the `assets` directory, you will find:
-- Two files containing the program's performance metrics with various datasets.
-- A PDF document that provides a detailed explanation of the program's design and the implemented solution.
-- A video explaining the implementation of the solution.
+You can compile the program using `g++` or any other compatible compiler. Here's an example using `g++`:
 
-## Video Explanation
-Below is the video that explains the implementation of the solution:
+```bash
+g++ -o main main.cpp -lssl -lcrypto
+```
 
-[![Video Explanation](assets/video_thumbnail.png)](assets/implementation_video.mp4)
-
-## Authors
-This program was developed by:
-
-1. [Harold Andres Riascos Manyoma](https://github.com/Larryc8)
-2. [Jose Miguel Caicedo Ortiz](https://github.com/JOSEMIGUELCAICEDOORTIZ)
-3. [Julian Esteban Gallego Lenis](https://github.com/Lazk3r)
-4. [Santiago Ruiz Quintero](https://github.com/Santiago7768)
+Ensure that OpenSSL is properly installed on your system.
